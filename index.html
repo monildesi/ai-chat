@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IITD AI ✨ Student Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
+        #app-container { height: 100vh; }
+        .chat-bubble { max-width: 85%; padding: 10px 16px; word-wrap: break-word; position: relative; }
+        .chat-bubble.user { background-color: #4f46e5; color: #ffffff; border-radius: 20px 20px 5px 20px; }
+        .chat-bubble.ai { background-color: #e5e7eb; color: #1f2937; border-radius: 20px 20px 20px 5px; }
+        .chat-bubble.ai p { margin: 0.5em 0; }
+        .chat-bubble.ai ul { margin-left: 20px; list-style-type: '👉'; padding-left: 1em; }
+        .chat-bubble.ai strong { color: #3730a3; }
+        .chat-bubble.clarification { background-color: #eef2ff; border: 1px solid #c7d2fe; }
+        .action-btn, .clarification-btn {
+            background-color: #fff; border: 1px solid #d1d5db; padding: 6px 12px;
+            border-radius: 16px; cursor: pointer; transition: all 0.2s ease;
+            font-size: 0.875rem; font-weight: 500;
+        }
+        .action-btn:hover, .clarification-btn:hover { background-color: #6366f1; color: white; border-color: #4f46e5; }
+        .typing-indicator span {
+            height: 8px; width: 8px; margin: 0 2px;
+            background-color: #6b7280; border-radius: 50%;
+            display: inline-block; animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+        .reply-btn {
+            position: absolute; top: 50%; right: -36px;
+            transform: translateY(-50%);
+            background-color: white; border-radius: 50%;
+            padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            cursor: pointer; opacity: 1; transition: opacity 0.2s ease;
+        }
+        .mode-btn {
+            padding: 6px 12px; border-radius: 9999px; font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+        .mode-btn.active { background-color: rgba(255,255,255,0.2); }
+    </style>
+</head>
+<body>
+
+    <div id="app-container" class="flex flex-col w-full h-full bg-white">
+        <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 flex justify-between items-center shadow-md flex-shrink-0">
+            <div class="flex items-center space-x-2">
+                <button id="mode-general" class="mode-btn active">General Info</button>
+                <button id="mode-student" class="mode-btn">Student Info</button>
+            </div>
+            <h1 class="hidden md:block text-xl font-bold">IIT Delhi AI Assistant</h1>
+            <button id="fun-fact-btn" title="Get a Fun Fact!" class="text-2xl hover:scale-110 transition-transform">✨</button>
+        </header>
+
+        <main id="chat-box" class="flex-1 p-4 md:p-6 overflow-y-auto flex flex-col space-y-2">
+            <div id="initial-loader" class="text-center py-10">
+                <div class="spinner mx-auto border-t-indigo-500" style="width: 40px; height: 40px; border-width: 4px; border-style: solid; border-color: #f3f3f3; border-top-color: #4f46e5; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <p class="mt-3 text-gray-600">Connecting to campus network... 📡</p>
+            </div>
+        </main>
+
+        <footer class="p-4 bg-gray-50 border-t flex-shrink-0">
+            <div id="reply-context-bar" class="hidden mb-2 p-2 bg-gray-200 rounded-lg text-sm text-gray-600 border-l-4 border-indigo-500">
+                <div class="flex justify-between items-center">
+                    <p class="truncate">Replying to: <strong id="reply-text"></strong></p>
+                    <button id="cancel-reply-btn" class="font-bold text-lg">&times;</button>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <input type="text" id="user-input" class="flex-grow block w-full rounded-full border-gray-300 shadow-sm px-4 py-3 focus:border-indigo-500 focus:ring-indigo-500" placeholder="Ask about general info...">
+                <button id="send-btn" class="inline-flex items-center justify-center rounded-full h-12 w-12 bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 transition-transform transform hover:scale-110">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.428A1 1 0 009.894 15V4.106A1 1 0 0010.894 2.553z" /></svg>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, getDocs, query, where, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const generalDbConfig = {
+            apiKey: "AIzaSyC2LrVQN3Vh_G9ySuxoYdr5rxyH58wbG_o",
+            authDomain: "drive-f95cd.firebaseapp.com",
+            projectId: "drive-f95cd",
+            storageBucket: "drive-f95cd.appspot.com",
+            messagingSenderId: "211712419126",
+            appId: "1:211712419126:web:a9d4dacf600b585c7e7f97"
+        };
+        const studentDbConfig = {
+            apiKey: "AIzaSyDy2Cvi0XOUZ0XuIIbrd6gK38cNQaR1-EM",
+            authDomain: "student-data-650d9.firebaseapp.com",
+            projectId: "student-data-650d9",
+            storageBucket: "student-data-650d9.appspot.com",
+            messagingSenderId: "1009833645201",
+            appId: "1:1009833645201:web:ebd5933162b02b0d1b9b30",
+        };
+        const geminiApiKey = "AIzaSyCX3ZntrczkXfadqUk2Ut-NGuu2rpSmH8E";
+
+        let generalDb, studentDb;
+        let conversationHistory = [], replyingToMessage = null;
+        let currentMode = 'general'; // 'general' or 'student'
+        let localKnowledgeBase = [];
+
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const funFactBtn = document.getElementById('fun-fact-btn');
+        const initialLoader = document.getElementById('initial-loader');
+        const replyContextBar = document.getElementById('reply-context-bar');
+        const replyText = document.getElementById('reply-text');
+        const cancelReplyBtn = document.getElementById('cancel-reply-btn');
+        const modeGeneralBtn = document.getElementById('mode-general');
+        const modeStudentBtn = document.getElementById('mode-student');
+
+        async function callGemini(prompt, isJson = false) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
+            const payload = { contents: [{ parts: [{ text: prompt }] }] };
+            if (isJson) {
+                payload.generationConfig = { responseMimeType: "application/json" };
+            }
+
+            let attempt = 0;
+            const maxAttempts = 5;
+            while (attempt < maxAttempts) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        return result.candidates[0].content.parts[0].text;
+                    }
+                    if (response.status === 429) {
+                        attempt++;
+                        const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                        console.warn(`Rate limit hit. Retrying in ${Math.round(delay/1000)}s...`);
+                        await new Promise(res => setTimeout(res, delay));
+                    } else {
+                        throw new Error(`API Error: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error("Gemini API call failed:", error);
+                    return "Sorry, I encountered an error trying to connect to the AI service.";
+                }
+            }
+            return "The AI service is currently busy. Please try again in a moment.";
+        }
+
+        const addChatMessage = (message, sender, options = {}) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex flex-col ${sender === 'user' ? 'items-end' : 'items-start'} space-y-2`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `chat-bubble ${sender}`;
+            if (options.type === 'clarification') bubble.classList.add('clarification');
+            bubble.innerHTML = marked.parse(message);
+            wrapper.appendChild(bubble);
+
+            if (options.actions) {
+                const actionsWrapper = document.createElement('div');
+                actionsWrapper.className = 'flex flex-wrap gap-2';
+                options.actions.forEach(action => {
+                    const button = document.createElement('button');
+                    button.className = 'action-btn';
+                    button.dataset.action = action.action;
+                    button.dataset.query = action.query;
+                    button.innerHTML = action.label;
+                    actionsWrapper.appendChild(button);
+                });
+                wrapper.appendChild(actionsWrapper);
+            }
+            chatBox.appendChild(wrapper);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        };
+        
+        const showTypingIndicator = () => {
+             const indicator = document.createElement('div');
+            indicator.id = 'typing-bubble';
+            indicator.className = 'chat-bubble ai typing-indicator';
+            indicator.innerHTML = '<span></span><span></span><span></span>';
+            chatBox.appendChild(indicator);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        };
+        const removeTypingIndicator = () => { document.getElementById('typing-bubble')?.remove(); };
+
+        const handleSend = async () => {
+            const userQuery = userInput.value.trim();
+            if (!userQuery) return;
+            addChatMessage(userQuery, 'user');
+            conversationHistory.push({role: 'user', text: userQuery});
+            userInput.value = '';
+            await getAiResponse(userQuery);
+        };
+        
+        const getAiResponse = async (userQuery) => {
+            sendBtn.disabled = true;
+            userInput.disabled = true;
+            showTypingIndicator();
+
+            let context = "";
+            let replyContext = "";
+            if (replyingToMessage) {
+                replyContext = `The user is directly replying to your previous message. Use this as the primary context.\n**Replied-To Message:** "${replyingToMessage.text}"\n\n`;
+            }
+
+            const intentDetectionPrompt = `Analyze the user's query to determine their primary intent and extract key entities. The intent can be 'find_person', 'find_club_members', or 'general_question'.
+            - For 'find_person', extract the 'name' and potential 'year'.
+            - For 'find_club_members', extract the 'club_name' and potential 'year'.
+            - For 'general_question', the query is the entity.
+            Recognize abbreviations: 'jwala'->'Jwalamukhi', 'ara'->'Aravali', 'cs'->'Computer Science', etc.
+            User Query: "${userQuery}"
+            Respond ONLY with a JSON object. Example: {"intent": "find_person", "name": "monil", "year": null}`;
+            
+            let intent = { intent: 'general_question' };
+            try { 
+                const intentJson = await callGemini(intentDetectionPrompt, true);
+                if (intentJson) {
+                    intent = JSON.parse(intentJson); 
+                }
+            } catch(e) { 
+                console.error("Could not parse intent, falling back to general question.", e);
+                intent = { intent: 'general_question' };
+            }
+
+            if (currentMode === 'student' && intent.intent === 'general_question') {
+                intent.intent = 'find_person';
+                intent.name = userQuery;
+            } else if (currentMode === 'general' && intent.intent !== 'general_question') {
+                intent.intent = 'general_question';
+            }
+
+            if (intent.intent === 'find_person') {
+                if (!intent.year) {
+                    addChatMessage("Which entry year are you looking for? e.g., 2024, 2025.", 'ai', {type: 'clarification'});
+                    removeTypingIndicator();
+                    sendBtn.disabled = false; userInput.disabled = false; userInput.focus();
+                    return;
+                }
+                const collectionName = `students_${intent.year}`;
+                const name = intent.name.toLowerCase();
+                const studentQuery = query(collection(studentDb, collectionName));
+                const snapshot = await getDocs(studentQuery);
+                const results = [];
+                snapshot.forEach(doc => {
+                    if (doc.data().name.toLowerCase().includes(name)) {
+                        results.push({type: 'Student', ...doc.data()});
+                    }
+                });
+                context = results.length > 0 ? JSON.stringify(results) : "No student found with that name in the specified year.";
+            } else if (intent.intent === 'find_club_members') {
+                if (!intent.year) {
+                    addChatMessage("Which year's club roster are you looking for?", 'ai', {type: 'clarification'});
+                    removeTypingIndicator();
+                    sendBtn.disabled = false; userInput.disabled = false; userInput.focus();
+                    return;
+                }
+                const clubCollectionName = `clubs_${intent.year}`;
+                const studentCollectionName = `students_${intent.year}`;
+                const clubQuery = query(collection(studentDb, clubCollectionName), where("name", "==", intent.club_name), limit(1));
+                const clubSnapshot = await getDocs(clubQuery);
+                if (!clubSnapshot.empty) {
+                    const clubData = clubSnapshot.docs[0].data();
+                    const memberEntryNumbers = clubData.members.map(m => m.entryNumber);
+                    const studentQuery = query(collection(studentDb, studentCollectionName), where('entryNumber', 'in', memberEntryNumbers));
+                    const studentSnapshot = await getDocs(studentQuery);
+                    const memberDetails = studentSnapshot.docs.map(d => d.data());
+                    context = `Club Found: ${JSON.stringify(clubData)}\nMember Details: ${JSON.stringify(memberDetails)}`;
+                } else {
+                    context = "No club found with that name for the specified year.";
+                }
+            } else { 
+                const generalQuery = query(collection(generalDb, "knowledge_base"), limit(50));
+                const snapshot = await getDocs(generalQuery);
+                const docs = snapshot.docs.map(doc => ({type: 'Knowledge', ...doc.data()}));
+                context = JSON.stringify(docs);
+            }
+
+            const prompt = `You are a fun, friendly, and super-helpful AI assistant for students at IIT Delhi. You are an expert at understanding slang, abbreviations, and typos. Answer questions based *only* on the provided "Context" below.
+
+            **Analysis Steps & Rules:**
+            1.  **Reply Context is KING:** If the context includes a "Replied-To Message", this is the MOST important piece of information. The user's new question is about this specific message.
+            2.  **Club Membership:** If the context contains a 'Club Found' document, your primary task is to list the names of the members from the 'Member Details' section.
+            3.  **Student Info:** If the context contains one or more 'Student' documents, present their information clearly using Markdown. If there are multiple, ask for clarification using the command: \`CLARIFY:[{"name":"Student Name 1", "entryNumber":"ID1"}, ...]\`.
+            4.  **General Query:** If the context contains 'Knowledge' documents, use them to answer the user's question.
+
+            ---
+            **Context:**
+            ${replyContext}
+            ${context}
+            ---
+            
+            **User's Question/Task:**
+            "${userQuery}"
+            
+            **Your Witty & Helpful Answer (in Markdown):**`;
+
+            const aiResponse = await callGemini(prompt);
+            removeTypingIndicator();
+
+            if (aiResponse.startsWith("CLARIFY:")) {
+                try {
+                    const jsonStr = aiResponse.substring(8);
+                    const students = JSON.parse(jsonStr);
+                    let clarificationHtml = "I found a few people with that name! 🤔 Which one are you looking for?\n\n<div class='flex flex-wrap gap-2 mt-2'>";
+                    students.forEach(student => {
+                        clarificationHtml += `<button class="clarification-btn" data-entry="${student.entryNumber}">${student.name}</button>`;
+                    });
+                    clarificationHtml += "</div>";
+                    addChatMessage(clarificationHtml, 'ai', {type: 'clarification'});
+                } catch(e) {
+                     addChatMessage("I found a few people with that name, but had a little trouble listing them out. Could you be more specific?", 'ai');
+                }
+            } else {
+                addChatMessage(aiResponse, 'ai');
+                conversationHistory.push({role: 'ai', text: aiResponse});
+            }
+
+            if (replyingToMessage) {
+                replyingToMessage = null;
+                replyContextBar.classList.add('hidden');
+            }
+
+            sendBtn.disabled = false;
+            userInput.disabled = false;
+            userInput.focus();
+        };
+
+        function setMode(mode) {
+            currentMode = mode;
+            if (mode === 'student') {
+                modeStudentBtn.classList.add('active');
+                modeGeneralBtn.classList.remove('active');
+                userInput.placeholder = "Search for a student or club...";
+            } else {
+                modeGeneralBtn.classList.add('active');
+                modeStudentBtn.classList.remove('active');
+                userInput.placeholder = "Ask about general info...";
+            }
+        }
+
+        async function main() {
+            try {
+                const generalApp = initializeApp(generalDbConfig, "generalApp");
+                const studentApp = initializeApp(studentDbConfig, "studentApp");
+                generalDb = getFirestore(generalApp);
+                studentDb = getFirestore(studentApp);
+
+                await Promise.all([
+                    signInAnonymously(getAuth(generalApp)),
+                    signInAnonymously(getAuth(studentApp))
+                ]);
+                
+                initialLoader.remove();
+                addChatMessage("Hey there! I'm the IITD AI Assistant, fully synced and ready to help. What's up? 🚀", 'ai');
+
+                sendBtn.addEventListener('click', handleSend);
+                userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
+                
+                modeGeneralBtn.addEventListener('click', () => setMode('general'));
+                modeStudentBtn.addEventListener('click', () => setMode('student'));
+
+                cancelReplyBtn.addEventListener('click', () => { 
+                    replyingToMessage = null;
+                    replyContextBar.classList.add('hidden');
+                 });
+                funFactBtn.addEventListener('click', async () => { 
+                    addChatMessage("Let me check my archives for a fun fact...", 'user');
+                    showTypingIndicator();
+                    const prompt = "Tell me a fun, interesting, or little-known fact about IIT Delhi, its history, campus, or a notable achievement. Make it sound exciting!";
+                    const fact = await callGemini(prompt);
+                    removeTypingIndicator();
+                    addChatMessage(fact, 'ai');
+                 });
+                chatBox.addEventListener('click', async (e) => { 
+                    const replyBtn = e.target.closest('.reply-btn');
+                    if (replyBtn) {
+                        const bubble = replyBtn.closest('.chat-bubble');
+                        replyingToMessage = { id: bubble.dataset.messageId, text: bubble.dataset.messageText };
+                        replyText.textContent = `"${replyingToMessage.text.substring(0, 50)}..."`;
+                        replyContextBar.classList.remove('hidden');
+                        userInput.focus();
+                        return;
+                    }
+
+                    const clarificationBtn = e.target.closest('.clarification-btn');
+                    if (clarificationBtn) {
+                        const entryNumber = clarificationBtn.dataset.entry;
+                        const student = localKnowledgeBase.find(doc => doc.type === 'Student' && doc.entryNumber === entryNumber);
+                        if (student) {
+                            addChatMessage(`Okay, let's talk about **${student.name}**! What would you like to know?`, 'ai');
+                            conversationHistory.push({role: 'ai', text: `Okay, let's talk about **${student.name}**!`});
+                        }
+                    }
+
+                    const actionBtn = e.target.closest('.action-btn');
+                    if (actionBtn) {
+                        const action = actionBtn.dataset.action;
+                        const userQuery = actionBtn.dataset.query;
+                        if (action === 'elaborate') {
+                            await getAiResponse(userQuery, true);
+                        }
+                    }
+                 });
+
+            } catch (error) {
+                console.error("Initialization failed:", error);
+                initialLoader.innerHTML = `<p class="text-red-500 font-bold">Error: Could not initialize the application.</p>`;
+            }
+        }
+
+        main();
+    </script>
+</body>
+</html>
