@@ -15,7 +15,7 @@
         .chat-bubble.user { background-color: #4f46e5; color: #ffffff; border-radius: 20px 20px 5px 20px; }
         .chat-bubble.ai { background-color: #e5e7eb; color: #1f2937; border-radius: 20px 20px 20px 5px; }
         .chat-bubble.ai p { margin: 0.5em 0; }
-        .chat-bubble.ai ul { margin-left: 20px; list-style-type: '👉'; padding-left: 1em; }
+        .chat-bubble.ai ul { margin-left: 20px; list-style-type: '�'; padding-left: 1em; }
         .chat-bubble.ai strong { color: #3730a3; }
         .chat-bubble.clarification { background-color: #eef2ff; border: 1px solid #c7d2fe; }
         .action-btn, .clarification-btn {
@@ -86,28 +86,19 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, getDocs, query, where, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const generalDbConfig = {
-            apiKey: "AIzaSyC2LrVQN3Vh_G9ySuxoYdr5rxyH58wbG_o",
-            authDomain: "drive-f95cd.firebaseapp.com",
-            projectId: "drive-f95cd",
-            storageBucket: "drive-f95cd.appspot.com",
-            messagingSenderId: "211712419126",
-            appId: "1:211712419126:web:a9d4dacf600b585c7e7f97"
-        };
-        const studentDbConfig = {
-            apiKey: "AIzaSyDy2Cvi0XOUZ0XuIIbrd6gK38cNQaR1-EM",
-            authDomain: "student-data-650d9.firebaseapp.com",
-            projectId: "student-data-650d9",
-            storageBucket: "student-data-650d9.appspot.com",
-            messagingSenderId: "1009833645201",
-            appId: "1:1009833645201:web:ebd5933162b02b0d1b9b30",
-        };
+        const databasePairs = [
+            { general: { name: "A1", config: { apiKey: "AIzaSyC2LrVQN3Vh_G9ySuxoYdr5rxyH58wbG_o", authDomain: "drive-f95cd.firebaseapp.com", projectId: "drive-f95cd" }}, student: { name: "A2", config: { apiKey: "AIzaSyDy2Cvi0XOUZ0XuIIbrd6gK38cNQaR1-EM", authDomain: "student-data-650d9.firebaseapp.com", projectId: "student-data-650d9" }}},
+            { general: { name: "B1", config: { apiKey: "AIzaSyBgqbpmpNE9nMDIMtnVoPNo5wCm8dVFhR0", authDomain: "aib1-871d3.firebaseapp.com", projectId: "aib1-871d3" }}, student: { name: "B2", config: { apiKey: "AIzaSyAO8VhRKYFh3wTWAkoqH5rdS-jdeNwddfQ", authDomain: "aib2-5e630.firebaseapp.com", projectId: "aib2-5e630" }}},
+            { general: { name: "C1", config: { apiKey: "AIzaSyDHV38ka1wb4JoY7SFI5QsPFLmu2FZ45FA", authDomain: "aic1-d0e7d.firebaseapp.com", projectId: "aic1-d0e7d" }}, student: { name: "C2", config: { apiKey: "AIzaSyAsPmsRS3_gNMJ7fOc-AAkCz9DQuOtmyFI", authDomain: "aic2-df7b2.firebaseapp.com", projectId: "aic2-df7b2" }}},
+            { general: { name: "D1", config: { apiKey: "AIzaSyB9E5T_6Qlxegv5SJKTzCwNff_9KQeuddc", authDomain: "aid1-83cc8.firebaseapp.com", projectId: "aid1-83cc8" }}, student: { name: "D2", config: { apiKey: "AIzaSyAVv3NUafJjWgyi8-3rlTNABKMLkUV0Z3E", authDomain: "aid2-f3deb.firebaseapp.com", projectId: "aid2-f3deb" }}},
+            { general: { name: "E1", config: { apiKey: "AIzaSyCRLLXLGYqXi253nYMoQK5bTbpC92GIeEY", authDomain: "aie1-8092e.firebaseapp.com", projectId: "aie1-8092e" }}, student: { name: "E2", config: { apiKey: "AIzaSyBYrXrwzfPtJ1sSB8WXPpwvDZCATj7zmSw", authDomain: "aie2-1c4cf.firebaseapp.com", projectId: "aie2-1c4cf" }}}
+        ];
+        
         const geminiApiKey = "AIzaSyCX3ZntrczkXfadqUk2Ut-NGuu2rpSmH8E";
 
         let generalDb, studentDb;
         let conversationHistory = [], replyingToMessage = null;
-        let currentMode = 'general'; // 'general' or 'student'
-        let localKnowledgeBase = [];
+        let currentMode = 'general';
 
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
@@ -224,12 +215,9 @@
             let intent = { intent: 'general_question' };
             try { 
                 const intentJson = await callGemini(intentDetectionPrompt, true);
-                if (intentJson) {
-                    intent = JSON.parse(intentJson); 
-                }
+                if (intentJson) intent = JSON.parse(intentJson); 
             } catch(e) { 
                 console.error("Could not parse intent, falling back to general question.", e);
-                intent = { intent: 'general_question' };
             }
 
             if (currentMode === 'student' && intent.intent === 'general_question') {
@@ -247,17 +235,24 @@
                     return;
                 }
                 const collectionName = `students_${intent.year}`;
-                const name = intent.name.toLowerCase();
-                const studentQuery = query(collection(studentDb, collectionName));
-                const snapshot = await getDocs(studentQuery);
-                const results = [];
-                snapshot.forEach(doc => {
-                    if (doc.data().name.toLowerCase().includes(name)) {
-                        results.push({type: 'Student', ...doc.data()});
-                    }
-                });
-                context = results.length > 0 ? JSON.stringify(results) : "No student found with that name in the specified year.";
-            } else if (intent.intent === 'find_club_members') {
+                // **FIX:** Check if intent.name exists before calling toLowerCase()
+                const name = intent.name ? intent.name.toLowerCase() : "";
+                if (!name) {
+                     intent.intent = 'general_question'; // Fallback if name is missing
+                } else {
+                    const studentQuery = query(collection(studentDb, collectionName));
+                    const snapshot = await getDocs(studentQuery);
+                    const results = [];
+                    snapshot.forEach(doc => {
+                        if (doc.data().name.toLowerCase().includes(name)) {
+                            results.push({type: 'Student', ...doc.data()});
+                        }
+                    });
+                    context = results.length > 0 ? JSON.stringify(results) : "No student found with that name in the specified year.";
+                }
+            } 
+            
+            if (intent.intent === 'find_club_members') {
                 if (!intent.year) {
                     addChatMessage("Which year's club roster are you looking for?", 'ai', {type: 'clarification'});
                     removeTypingIndicator();
@@ -278,7 +273,9 @@
                 } else {
                     context = "No club found with that name for the specified year.";
                 }
-            } else { 
+            } 
+            
+            if (intent.intent === 'general_question') { 
                 const generalQuery = query(collection(generalDb, "knowledge_base"), limit(50));
                 const snapshot = await getDocs(generalQuery);
                 const docs = snapshot.docs.map(doc => ({type: 'Knowledge', ...doc.data()}));
@@ -350,8 +347,11 @@
 
         async function main() {
             try {
-                const generalApp = initializeApp(generalDbConfig, "generalApp");
-                const studentApp = initializeApp(studentDbConfig, "studentApp");
+                const selectedPair = databasePairs[Math.floor(Math.random() * databasePairs.length)];
+                console.log(`Connecting to database pair: ${selectedPair.general.name} & ${selectedPair.student.name}`);
+
+                const generalApp = initializeApp(selectedPair.general.config, selectedPair.general.name);
+                const studentApp = initializeApp(selectedPair.student.config, selectedPair.student.name);
                 generalDb = getFirestore(generalApp);
                 studentDb = getFirestore(studentApp);
 
@@ -411,6 +411,7 @@
                         }
                     }
                  });
+
 
             } catch (error) {
                 console.error("Initialization failed:", error);
