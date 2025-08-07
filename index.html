@@ -8,76 +8,254 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        html, body { height: 100%; overflow: hidden; }
-        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
-        #app-container { height: 100vh; }
-        .chat-bubble { max-width: 85%; padding: 10px 16px; word-wrap: break-word; position: relative; }
-        .chat-bubble.user { background-color: #4f46e5; color: #ffffff; border-radius: 20px 20px 5px 20px; }
-        .chat-bubble.ai { background-color: #e5e7eb; color: #1f2937; border-radius: 20px 20px 20px 5px; }
+        /* Base styles for a dark, Gemini-like theme */
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #131314;
+            color: #e3e3e3;
+        }
+        #app-container {
+            height: 100vh; /* Full viewport height */
+            display: flex;
+            flex-direction: column;
+        }
+        /* Header styling */
+        header {
+            background-color: #131314;
+            border-bottom: 1px solid #333;
+            flex-shrink: 0; /* Prevent header from shrinking */
+        }
+        #fun-fact-btn {
+            background: linear-gradient(90deg, #89b3f8, #9a89f7, #d783f5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-fill-color: transparent;
+        }
+
+        /* Main chat area styling */
+        #chat-container {
+            flex: 1 1 auto; /* Allow container to grow and shrink */
+            overflow-y: auto;
+            padding: 1rem 0;
+            display: flex; /* Use flexbox for vertical centering */
+            flex-direction: column;
+        }
+        #chat-box {
+            width: 100%;
+            max-width: 68rem; /* 768px */
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        /* Class to center chat box initially and push to top after first message */
+        #chat-box.initial-center {
+            margin-top: auto; /* Push to vertical center */
+            margin-bottom: auto;
+        }
+
+
+        /* Chat bubble styling */
+        .chat-message-wrapper {
+            display: flex;
+            gap: 1rem; /* 16px */
+            margin-bottom: 1.5rem; /* 24px */
+        }
+        .chat-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .avatar-user {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .avatar-ai {
+            background: linear-gradient(135deg, #4285f4, #9b72cb);
+            color: white;
+        }
+        .chat-bubble {
+            max-width: 90%;
+            padding: 1px; /* for reply button positioning */
+            word-wrap: break-word;
+            position: relative;
+        }
+        .chat-bubble .content {
+             padding: 12px 18px;
+        }
+        .chat-bubble.user .content {
+            background-color: #4f46e51a;
+            border-radius: 6px 20px 20px 20px;
+        }
+        .chat-bubble.ai .content {
+            background-color: #1e1f20;
+            border-radius: 6px 20px 20px 20px;
+        }
         .chat-bubble.ai p { margin: 0.5em 0; }
         .chat-bubble.ai ul { margin-left: 20px; list-style-type: '👉'; padding-left: 1em; }
-        .chat-bubble.ai strong { color: #3730a3; }
-        .chat-bubble.clarification { background-color: #eef2ff; border: 1px solid #c7d2fe; }
-        .action-btn, .clarification-btn {
-            background-color: #fff; border: 1px solid #d1d5db; padding: 6px 12px;
-            border-radius: 16px; cursor: pointer; transition: all 0.2s ease;
-            font-size: 0.875rem; font-weight: 500;
+        .chat-bubble.ai strong { color: #89b3f8; }
+
+        /* Clarification bubble for specific questions */
+        .chat-bubble.clarification .content {
+            background-color: #2c2144;
+            border: 1px solid #4f46e5;
         }
-        .action-btn:hover, .clarification-btn:hover { background-color: #6366f1; color: white; border-color: #4f46e5; }
+        .clarification-btn {
+            background-color: #282a2d; border: 1px solid #555; padding: 6px 12px;
+            border-radius: 16px; cursor: pointer; transition: all 0.2s ease;
+            font-size: 0.875rem; font-weight: 500; color: #e3e3e3;
+        }
+        .clarification-btn:hover { background-color: #4f46e5; }
+        
+        /* Typing indicator animation */
         .typing-indicator span {
             height: 8px; width: 8px; margin: 0 2px;
-            background-color: #6b7280; border-radius: 50%;
+            background-color: #9e9e9e; border-radius: 50%;
             display: inline-block; animation: bounce 1.4s infinite ease-in-out both;
         }
         .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
         .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+
+        /* Reply button on hover */
         .reply-btn {
-            position: absolute; top: 50%; right: -36px;
+            position: absolute; top: 50%; right: -40px;
             transform: translateY(-50%);
-            background-color: white; border-radius: 50%;
-            padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            cursor: pointer; opacity: 1; transition: opacity 0.2s ease;
+            background-color: #2c2d2f; border-radius: 50%;
+            padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            cursor: pointer; opacity: 0; transition: opacity 0.2s ease;
         }
+        .chat-bubble:hover .reply-btn { opacity: 1; }
+
+        /* Footer and Input area styling */
+        footer {
+            background-color: #131314;
+            padding: 0.5rem 1rem 1rem 1rem;
+            flex-shrink: 0; /* Prevent footer from shrinking */
+        }
+        .footer-content {
+            max-width: 68rem;
+            margin: 0 auto;
+        }
+        /* Mode changer buttons (now at the bottom) */
+        #mode-selector {
+            display: flex;
+            gap: 0.5rem; /* 8px */
+            margin-bottom: 0.75rem; /* 12px */
+            overflow-x: auto; /* Allow horizontal scrolling */
+            white-space: nowrap; /* Keep buttons on one line */
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        #mode-selector::-webkit-scrollbar {
+            display: none;
+        }
+
         .mode-btn {
-            padding: 6px 12px; border-radius: 9999px; font-weight: 500;
+            padding: 6px 16px; border-radius: 9999px; font-weight: 500;
+            background-color: #282a2d; color: #e3e3e3;
+            border: 1px solid #444;
+            cursor: pointer;
+            flex-shrink: 0; /* Prevent buttons from shrinking */
             transition: background-color 0.2s ease;
         }
-        .mode-btn.active { background-color: rgba(255,255,255,0.2); }
+        .mode-btn:hover { background-color: #3c3d40; }
+        .mode-btn.active { background-color: #4f46e5; border-color: #4f46e5; color: white; }
+
+        /* Reply context bar styling */
+        #reply-context-bar {
+            background-color: #282a2d;
+            border-left-color: #89b3f8;
+        }
+        
+        /* Input field and send button */
+        .input-wrapper {
+            position: relative;
+        }
+        #user-input {
+            width: 100%;
+            border-radius: 28px;
+            background-color: #1e1f20;
+            border: 1px solid #444;
+            color: #e3e3e3;
+            padding: 14px 56px 14px 20px; /* More padding */
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        #user-input:focus {
+            outline: none;
+            border-color: #89b3f8;
+            box-shadow: none;
+            --tw-ring-shadow: none;
+        }
+        #send-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #4f46e5;
+        }
+         #send-btn:hover {
+            background-color: #6366f1;
+        }
+        #send-btn:disabled {
+            background-color: #3c3d40;
+            cursor: not-allowed;
+        }
+
+        /* Initial Loader */
+        .spinner {
+             animation: spin 1s linear infinite;
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <div id="app-container" class="flex flex-col w-full h-full bg-white">
-        <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 flex justify-between items-center shadow-md flex-shrink-0">
-            <div class="flex items-center space-x-2">
-                <button id="mode-general" class="mode-btn active">General Info</button>
-                <button id="mode-student" class="mode-btn">Student Info</button>
-                <button id="mode-food" class="mode-btn">Food</button>
-            </div>
-            <h1 class="hidden md:block text-xl font-bold">IIT Delhi AI Assistant</h1>
-            <button id="fun-fact-btn" title="Get a Fun Fact!" class="text-2xl hover:scale-110 transition-transform">✨</button>
+    <div id="app-container" class="w-full h-full">
+        <header class="p-3 flex justify-between items-center shadow-md flex-shrink-0">
+            <h1 class="text-xl font-bold">IIT Delhi AI</h1>
+            <button id="fun-fact-btn" title="Get a Fun Fact!" class="text-3xl hover:scale-110 transition-transform">✨</button>
         </header>
 
-        <main id="chat-box" class="flex-1 p-4 md:p-6 overflow-y-auto flex flex-col space-y-2">
-            <div id="initial-loader" class="text-center py-10">
-                <div class="spinner mx-auto border-t-indigo-500" style="width: 40px; height: 40px; border-width: 4px; border-style: solid; border-color: #f3f3f3; border-top-color: #4f46e5; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                <p class="mt-3 text-gray-600">Connecting to campus network... 📡</p>
+        <main id="chat-container" class="flex-1">
+            <div id="chat-box" class="flex flex-col space-y-4 initial-center">
+                <div id="initial-loader" class="text-center py-10">
+                    <div class="spinner mx-auto border-t-indigo-500" style="width: 40px; height: 40px; border-width: 4px; border-style: solid; border-color: #333; border-top-color: #4f46e5; border-radius: 50%;"></div>
+                    <p class="mt-3 text-gray-400">Connecting to campus network... 📡</p>
+                </div>
+                <!-- Chat messages will be appended here -->
             </div>
         </main>
 
-        <footer class="p-4 bg-gray-50 border-t flex-shrink-0">
-            <div id="reply-context-bar" class="hidden mb-2 p-2 bg-gray-200 rounded-lg text-sm text-gray-600 border-l-4 border-indigo-500">
-                <div class="flex justify-between items-center">
-                    <p class="truncate">Replying to: <strong id="reply-text"></strong></p>
-                    <button id="cancel-reply-btn" class="font-bold text-lg">&times;</button>
+        <footer class="flex-shrink-0">
+            <div class="footer-content">
+                 <div id="mode-selector">
+                    <button id="mode-general" class="mode-btn active">General</button>
+                    <button id="mode-student" class="mode-btn">Student</button>
+                    <button id="mode-food" class="mode-btn">Food</button>
                 </div>
-            </div>
-            <div class="flex items-center space-x-3">
-                <input type="text" id="user-input" class="flex-grow block w-full rounded-full border-gray-300 shadow-sm px-4 py-3 focus:border-indigo-500 focus:ring-indigo-500" placeholder="Ask about general info...">
-                <button id="send-btn" class="inline-flex items-center justify-center rounded-full h-12 w-12 bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 transition-transform transform hover:scale-110">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.428A1 1 0 009.894 15V4.106A1 1 0 0010.894 2.553z" /></svg>
-                </button>
+                <div id="reply-context-bar" class="hidden mb-2 p-2 rounded-lg text-sm text-gray-300 border-l-4">
+                    <div class="flex justify-between items-center">
+                        <p class="truncate">Replying to: <strong id="reply-text"></strong></p>
+                        <button id="cancel-reply-btn" class="font-bold text-lg">&times;</button>
+                    </div>
+                </div>
+                <div class="input-wrapper flex items-center space-x-3">
+                    <input type="text" id="user-input" placeholder="Message IITD AI...">
+                    <button id="send-btn" class="inline-flex items-center justify-center rounded-full h-10 w-10 text-white shadow-sm transition-transform transform hover:scale-105">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.428A1 1 0 009.894 15V4.106A1 1 0 0010.894 2.553z" /></svg>
+                    </button>
+                </div>
             </div>
         </footer>
     </div>
@@ -87,6 +265,7 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, getDocs, query, where, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // --- CORE LOGIC (UNCHANGED) ---
         const databasePairs = [
             { general: { name: "A1", config: { apiKey: "AIzaSyC2LrVQN3Vh_G9ySuxoYdr5rxyH58wbG_o", authDomain: "drive-f95cd.firebaseapp.com", projectId: "drive-f95cd" }}, student: { name: "A2", config: { apiKey: "AIzaSyDy2Cvi0XOUZ0XuIIbrd6gK38cNQaR1-EM", authDomain: "student-data-650d9.firebaseapp.com", projectId: "student-data-650d9" }}},
             { general: { name: "B1", config: { apiKey: "AIzaSyBgqbpmpNE9nMDIMtnVoPNo5wCm8dVFhR0", authDomain: "aib1-871d3.firebaseapp.com", projectId: "aib1-871d3" }}, student: { name: "B2", config: { apiKey: "AIzaSyAO8VhRKYFh3wTWAkoqH5rdS-jdeNwddfQ", authDomain: "aib2-5e630.firebaseapp.com", projectId: "aib2-5e630" }}},
@@ -99,8 +278,9 @@
         let generalDb, studentDb;
         let conversationHistory = [], replyingToMessage = null;
         let currentMode = 'general';
-        let localKnowledgeBase = []; // Used for clarification clicks
+        let localKnowledgeBase = [];
 
+        const chatContainer = document.getElementById('chat-container');
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
@@ -134,52 +314,105 @@
         }
 
         const addChatMessage = (message, sender, options = {}) => {
+            // Remove initial centering class on first message
+            if (chatBox.classList.contains('initial-center')) {
+                chatBox.classList.remove('initial-center');
+                // Clear the loader and initial AI message to start fresh
+                if(initialLoader) initialLoader.remove();
+                // We might want to keep the first AI message, so let's check
+                const firstMessage = chatBox.querySelector('.chat-message-wrapper');
+                
+            }
+
             const wrapper = document.createElement('div');
-            wrapper.className = `flex flex-col ${sender === 'user' ? 'items-end' : 'items-start'} space-y-2`;
+            wrapper.className = 'chat-message-wrapper';
+
+            const avatar = document.createElement('div');
+            avatar.className = `chat-avatar ${sender === 'user' ? 'avatar-user' : 'avatar-ai'}`;
+            avatar.textContent = sender === 'user' ? 'You' : 'AI';
+
             const bubble = document.createElement('div');
             bubble.className = `chat-bubble ${sender}`;
             if (options.type === 'clarification') bubble.classList.add('clarification');
+            
+            const content = document.createElement('div');
+            content.className = 'content';
+            
             if (sender === 'ai') {
                 const messageId = Date.now();
                 bubble.dataset.messageId = messageId;
                 bubble.dataset.messageText = message;
                 const replyBtn = document.createElement('div');
                 replyBtn.className = 'reply-btn';
-                replyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
+                replyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
                 bubble.appendChild(replyBtn);
             }
-            bubble.innerHTML += marked.parse(message);
+            
+            content.innerHTML = marked.parse(message);
+            bubble.appendChild(content);
+
+            if (sender === 'user') {
+                wrapper.style.flexDirection = 'row-reverse';
+            }
+            
+            wrapper.appendChild(avatar);
             wrapper.appendChild(bubble);
+
             if (options.actions) {
                 const actionsWrapper = document.createElement('div');
-                actionsWrapper.className = 'flex flex-wrap gap-2';
+                actionsWrapper.className = 'flex flex-wrap gap-2 mt-2 pl-12'; // Aligned with bubble content
                 options.actions.forEach(action => {
                     const button = document.createElement('button');
-                    button.className = 'action-btn';
+                    button.className = 'clarification-btn'; // Re-using style
                     button.dataset.action = action.action;
                     button.dataset.query = action.query;
                     button.innerHTML = action.label;
                     actionsWrapper.appendChild(button);
                 });
-                wrapper.appendChild(actionsWrapper);
+                chatBox.appendChild(wrapper);
+                chatBox.appendChild(actionsWrapper);
+            } else {
+                 chatBox.appendChild(wrapper);
             }
-            chatBox.appendChild(wrapper);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            
+            chatContainer.scrollTop = chatContainer.scrollHeight;
         };
         
         const showTypingIndicator = () => {
-             const indicator = document.createElement('div');
+            if (chatBox.classList.contains('initial-center')) {
+                chatBox.classList.remove('initial-center');
+                if(initialLoader) initialLoader.remove();
+            }
+            const wrapper = document.createElement('div');
+            wrapper.id = 'typing-indicator-wrapper';
+            wrapper.className = 'chat-message-wrapper';
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'chat-avatar avatar-ai';
+            avatar.textContent = 'AI';
+
+            const indicator = document.createElement('div');
             indicator.id = 'typing-bubble';
             indicator.className = 'chat-bubble ai typing-indicator';
-            indicator.innerHTML = '<span></span><span></span><span></span>';
-            chatBox.appendChild(indicator);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            indicator.innerHTML = '<div class="content"><span></span><span></span><span></span></div>';
+            
+            wrapper.appendChild(avatar);
+            wrapper.appendChild(indicator);
+            chatBox.appendChild(wrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
         };
-        const removeTypingIndicator = () => { document.getElementById('typing-bubble')?.remove(); };
+        const removeTypingIndicator = () => { document.getElementById('typing-indicator-wrapper')?.remove(); };
 
         const handleSend = async () => {
             const userQuery = userInput.value.trim();
             if (!userQuery) return;
+
+            // This is the first interaction, clear the initial state.
+            if (chatBox.classList.contains('initial-center')) {
+                chatBox.classList.remove('initial-center');
+                chatBox.innerHTML = ''; // Clear loader and welcome message
+            }
+
             addChatMessage(userQuery, 'user');
             conversationHistory.push({role: 'user', text: userQuery});
             userInput.value = '';
@@ -199,11 +432,11 @@
                 replyContext = `The user is directly replying to your previous message. Use this as the primary context.\n**Replied-To Message:** "${replyingToMessage.text}"\n\n`;
             }
 
-           const intentDetectionPrompt = `Analyze the user's query to determine their primary intent and extract key entities. The intent can be 'find_person', 'find_club_members', 'find_menu_or_shop', or 'general_question'.
+            const intentDetectionPrompt = `Analyze the user's query to determine their primary intent and extract key entities. The intent can be 'find_person', 'find_club_members', 'find_menu_or_shop', or 'general_question'.
                 - For 'find_menu_or_shop', extract 'hostel_name', 'shop_name', 'day', and 'meal'.
                 - For 'find_person', extract 'name' and 'year'.
                 - For 'find_club_members', extract 'club_name' and 'year'.
-                Recognize abbreviations: 'jwala'->'Jwalamukhi Hostel', 'ccd'->'Cafe Coffee Day', etc.
+                - Recognize abbreviations: 'jwala'->'Jwalamukhi Hostel', 'ccd'->'Cafe Coffee Day', etc.
                 User Query: "${userQuery}"
                 Respond ONLY with a valid JSON object.`;
             
@@ -264,7 +497,7 @@
                 **Context:** ${context} --- **User's Question:** "${userQuery}"`;
             }
             
-            const fullPrompt = `${finalPrompt} Your response should be witty, helpful, and use Markdown and emojis.`;
+            const fullPrompt = `${replyContext}${finalPrompt} Your response should be witty, helpful, and use Markdown and emojis.`;
             const aiResponse = await callGemini(fullPrompt);
             removeTypingIndicator();
 
@@ -272,14 +505,14 @@
                 try {
                     const jsonStr = aiResponse.substring(8);
                     const students = JSON.parse(jsonStr);
-                    let clarificationHtml = "I found a few people with that name! 🤔 Which one are you looking for?\n\n<div class='flex flex-wrap gap-2 mt-2'>";
+                    let clarificationHtml = "I found a few people with that name! 🤔 Which one are you looking for?<div class='flex flex-wrap gap-2 mt-2'>";
                     students.forEach(student => {
                         clarificationHtml += `<button class="clarification-btn" data-entry="${student.entryNumber}">${student.name}</button>`;
                     });
                     clarificationHtml += "</div>";
                     addChatMessage(clarificationHtml, 'ai', {type: 'clarification'});
                 } catch(e) {
-                        addChatMessage("I found a few people with that name, but had a little trouble listing them out. Could you be more specific?", 'ai');
+                    addChatMessage("I found a few people with that name, but had a little trouble listing them out. Could you be more specific?", 'ai');
                 }
             } else {
                 addChatMessage(aiResponse || "Sorry, I couldn't get a response.", 'ai');
@@ -298,19 +531,17 @@
 
         function setMode(mode) {
             currentMode = mode;
-            modeGeneralBtn.classList.remove('active');
-            modeStudentBtn.classList.remove('active');
-            modeFoodBtn.classList.remove('active');
+            [modeGeneralBtn, modeStudentBtn, modeFoodBtn].forEach(btn => btn.classList.remove('active'));
 
             if (mode === 'student') {
                 modeStudentBtn.classList.add('active');
-                userInput.placeholder = "Search for a student or club...";
+                userInput.placeholder = "Search for a student by name & year...";
             } else if (mode === 'food') {
                 modeFoodBtn.classList.add('active');
-                userInput.placeholder = "Ask about hostel messes, CCD, Amul....";
+                userInput.placeholder = "What's on the menu at Jwala tonight?";
             } else {
                 modeGeneralBtn.classList.add('active');
-                userInput.placeholder = "Ask about general info...";
+                userInput.placeholder = "Ask about clubs, events, places...";
             }
         }
 
@@ -329,8 +560,16 @@
                     signInAnonymously(getAuth(studentApp))
                 ]);
                 
-                initialLoader.remove();
-                addChatMessage("Hey there! I'm the IITD AI Assistant, fully synced and ready to help. What's up? �", 'ai');
+                const loader = document.getElementById('initial-loader');
+                if(loader) loader.remove();
+                
+                // Add the initial welcome message
+                addChatMessage("Hey there! I'm the IITD AI Assistant, fully synced and ready to help. What's up? 🚀", 'ai');
+                // After adding the first message, we must remove the centering class so it aligns top
+                chatBox.classList.remove('initial-center');
+                // But for the very first load, we add it back so the first message is centered
+                chatBox.classList.add('initial-center');
+
 
                 sendBtn.addEventListener('click', handleSend);
                 userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
@@ -342,15 +581,14 @@
                 cancelReplyBtn.addEventListener('click', () => { 
                     replyingToMessage = null;
                     replyContextBar.classList.add('hidden');
-                 });
+                });
+
                 funFactBtn.addEventListener('click', async () => { 
                     addChatMessage("Let me check my archives for a fun fact...", 'user');
-                    showTypingIndicator();
                     const prompt = "Tell me a fun, interesting, or little-known fact about IIT Delhi, its history, campus, or a notable achievement. Make it sound exciting!";
-                    const fact = await callGemini(prompt);
-                    removeTypingIndicator();
-                    addChatMessage(fact, 'ai');
-                 });
+                    await getAiResponse(prompt);
+                });
+
                 chatBox.addEventListener('click', async (e) => { 
                     const replyBtn = e.target.closest('.reply-btn');
                     if (replyBtn) {
@@ -367,26 +605,16 @@
                         const entryNumber = clarificationBtn.dataset.entry;
                         const student = localKnowledgeBase.find(doc => doc.type === 'Student' && doc.entryNumber === entryNumber);
                         if (student) {
-                            addChatMessage(`Okay, let's talk about **${student.name}**! What would you like to know?`, 'ai');
-                            conversationHistory.push({role: 'ai', text: `Okay, let's talk about **${student.name}**!`});
+                            addChatMessage(`Okay, you selected **${student.name}**. What would you like to know?`, 'user');
+                            await getAiResponse(`Tell me about the student: ${JSON.stringify(student)}`);
                         }
                     }
-
-                    const actionBtn = e.target.closest('.action-btn');
-                    if (actionBtn) {
-                        const action = actionBtn.dataset.action;
-                        const userQuery = actionBtn.dataset.query;
-                        if (action === 'elaborate') {
-                            await getAiResponse(userQuery, true);
-                        }
-                    }
-                 });
-
-
+                });
 
             } catch (error) {
                 console.error("Initialization failed:", error);
-                initialLoader.innerHTML = `<p class="text-red-500 font-bold">Error: Could not initialize the application.</p>`;
+                const loader = document.getElementById('initial-loader') || document.getElementById('chat-box');
+                loader.innerHTML = `<p class="text-red-500 font-bold p-4 text-center">Error: Could not initialize the application. Please check the console.</p>`;
             }
         }
 
