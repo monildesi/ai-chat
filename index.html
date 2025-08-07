@@ -21,7 +21,7 @@
         
         /* Switched to CSS Grid for robust full-page layout */
         #app-container {
-            height: 100vh;
+            height: 100%; /* Use 100% to respect parent, JS will set the body/html height */
             display: grid;
             grid-template-rows: auto 1fr auto; /* Header, Main (stretches), Footer */
         }
@@ -258,6 +258,18 @@
             </div>
         </footer>
     </div>
+    
+    <script>
+        // This script fixes the 100vh issue on mobile browsers
+        function setAppHeight() {
+            const doc = document.documentElement;
+            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        }
+        window.addEventListener('resize', setAppHeight);
+        setAppHeight();
+        // We also need to adjust the style for the app container to use this variable
+        document.getElementById('app-container').style.height = 'var(--app-height)';
+    </script>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
