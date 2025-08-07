@@ -276,7 +276,7 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, getDocs, query, where, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- CORE LOGIC (UNCHANGED) ---
+        // --- CORE LOGIC ---
         const databasePairs = [
             { general: { name: "A1", config: { apiKey: "AIzaSyC2LrVQN3Vh_G9ySuxoYdr5rxyH58wbG_o", authDomain: "drive-f95cd.firebaseapp.com", projectId: "drive-f95cd" }}, student: { name: "A2", config: { apiKey: "AIzaSyDy2Cvi0XOUZ0XuIIbrd6gK38cNQaR1-EM", authDomain: "student-data-650d9.firebaseapp.com", projectId: "student-data-650d9" }}},
             { general: { name: "B1", config: { apiKey: "AIzaSyBgqbpmpNE9nMDIMtnVoPNo5wCm8dVFhR0", authDomain: "aib1-871d3.firebaseapp.com", projectId: "aib1-871d3" }}, student: { name: "B2", config: { apiKey: "AIzaSyAO8VhRKYFh3wTWAkoqH5rdS-jdeNwddfQ", authDomain: "aib2-5e630.firebaseapp.com", projectId: "aib2-5e630" }}},
@@ -406,6 +406,9 @@
         const handleSend = async () => {
             const userQuery = userInput.value.trim();
             if (!userQuery) return;
+
+            const startButtonContainer = document.getElementById('start-chat-btn-container');
+            if (startButtonContainer) startButtonContainer.remove();
 
             if (chatBox.classList.contains('initial-center')) {
                 chatBox.classList.remove('initial-center');
@@ -563,6 +566,21 @@
                 if(loader) loader.remove();
                 
                 addChatMessage("Hey there! I'm the IITD AI Assistant, fully synced and ready to help. What's up? 🚀", 'ai');
+                
+                const startButtonContainer = document.createElement('div');
+                startButtonContainer.id = 'start-chat-btn-container';
+                startButtonContainer.className = 'flex justify-center mt-4';
+                startButtonContainer.innerHTML = `<button id="start-chat-btn" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-full hover:bg-indigo-700 transition-all shadow-lg">Let's get started ✨</button>`;
+                chatBox.appendChild(startButtonContainer);
+
+                document.getElementById('start-chat-btn').addEventListener('click', () => {
+                    if (chatBox.classList.contains('initial-center')) {
+                        chatBox.classList.remove('initial-center');
+                    }
+                    startButtonContainer.remove();
+                    userInput.focus();
+                });
+
 
                 sendBtn.addEventListener('click', handleSend);
                 userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
@@ -577,6 +595,8 @@
                 });
 
                 funFactBtn.addEventListener('click', async () => { 
+                    const startButton = document.getElementById('start-chat-btn-container');
+                    if(startButton) startButton.remove();
                     if (chatBox.classList.contains('initial-center')) {
                         chatBox.classList.remove('initial-center');
                         chatBox.innerHTML = '';
@@ -599,6 +619,8 @@
 
                     const clarificationBtn = e.target.closest('.clarification-btn');
                     if (clarificationBtn) {
+                        const startButton = document.getElementById('start-chat-btn-container');
+                        if(startButton) startButton.remove();
                          if (chatBox.classList.contains('initial-center')) {
                             chatBox.classList.remove('initial-center');
                             chatBox.innerHTML = '';
@@ -609,6 +631,16 @@
                             addChatMessage(`Okay, you selected **${student.name}**. What would you like to know?`, 'user');
                             await getAiResponse(`Tell me about the student: ${JSON.stringify(student)}`);
                         }
+                    }
+                });
+
+                chatBox.addEventListener('dblclick', (e) => {
+                    const bubble = e.target.closest('.chat-bubble.ai');
+                    if (bubble && bubble.dataset.messageId) {
+                        replyingToMessage = { id: bubble.dataset.messageId, text: bubble.dataset.messageText };
+                        replyText.textContent = `"${replyingToMessage.text.substring(0, 50)}..."`;
+                        replyContextBar.classList.remove('hidden');
+                        userInput.focus();
                     }
                 });
 
